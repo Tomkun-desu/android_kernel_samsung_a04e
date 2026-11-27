@@ -82,6 +82,20 @@ class OutputTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'No A04e device trees'):
             verify.check_outputs(self.out)
 
+    def test_root_configuration_requires_linked_functions_and_key_type(self):
+        fragment = (SCRIPTS.parents[1] / 'arch/arm64/configs/a04e-root.config').read_text()
+        config = self.config.replace('CONFIG_SECURITY_DEFEX=y\n', '') + fragment
+        config += 'CONFIG_64BIT=y\nCONFIG_THREAD_INFO_IN_TASK=y\nCONFIG_SECURITY_SELINUX=y\n'
+        (self.out / '.config').write_text(config)
+        symbols = ['ksu_handle_execveat', 'ksu_handle_post_execveat_sucompat', 'ksu_handle_sys_reboot', 'susfs_init', 'susfs_set_priority_uid_filter', 'nomount_init', 'nm_key_preparse', 'nm_hijacked_lookup', 'path_umount']
+        rows = [f'ffffff8008080000 T {name}\n' for name in symbols]
+        (self.out / 'System.map').write_text(''.join(rows) + 'ffffff8008090000 D nm_key_type\n')
+        result = verify.check_outputs(self.out, rooted=True)
+        self.assertEqual(set(result['linked_root_symbols']), set(symbols + ['nm_key_type']))
+        (self.out / 'System.map').write_text(''.join(rows) + 'ffffff8008090000 U nm_key_type\n')
+        with self.assertRaisesRegex(ValueError, 'Missing linked root symbols'):
+            verify.check_outputs(self.out, rooted=True)
+
 
 class BuildContractTests(unittest.TestCase):
     def setUp(self):

@@ -1,0 +1,142 @@
+{
+  "asset_sha256": {
+    "integration.patch": "959bf12a28469a26922a06dfb0ff2ed928ddcae90d7fe6a5a82485c763453bb7",
+    "known-local-fixes.patch": "02302fc6a447c9a97a4bcddebdf45f660234a44b9592815b9a15203e6acda54d",
+    "upstream-hooks.sh": "9afa89ee6474b80e2615096b926c1d8eef1cb7585f74130a375fbe6cf63d00f2",
+    "upstream.patch": "7e8463304562944f889159bcc554c0ed8891b34021ab5ef1bba15ee924780ab5",
+    "vendor-adaptation.patch": "46ad82d26ff5fb0ba40ede64e84af8acadfc444cd61d79c5fcdf05eaba3f511e"
+  },
+  "context_paths": [
+    "Makefile",
+    "fs/internal.h",
+    "security/selinux/include/security.h"
+  ],
+  "hooks_sha256": "9afa89ee6474b80e2615096b926c1d8eef1cb7585f74130a375fbe6cf63d00f2",
+  "kernel_commit": "38abda3e382f6e5e637a231400617babea54cbad",
+  "ksu_capabilities": [
+    "ksu_handle_setresuid"
+  ],
+  "ksu_probe_commit": "cac1e79355ef451539f5c5ba9dc2bda1c64069de",
+  "patch_paths": [
+    "block/ioprio.c",
+    "fs/Makefile",
+    "fs/namei.c",
+    "fs/namespace.c",
+    "fs/notify/fdinfo.c",
+    "fs/proc/base.c",
+    "fs/proc/cmdline.c",
+    "fs/proc/fd.c",
+    "fs/proc/task_mmu.c",
+    "fs/proc_namespace.c",
+    "fs/readdir.c",
+    "fs/stat.c",
+    "fs/statfs.c",
+    "fs/super.c",
+    "fs/susfs.c",
+    "include/linux/susfs.h",
+    "include/linux/susfs_def.h",
+    "kernel/kallsyms.c",
+    "kernel/sys.c",
+    "mm/memory.c",
+    "security/selinux/avc.c"
+  ],
+  "patch_sha256": "7e8463304562944f889159bcc554c0ed8891b34021ab5ef1bba15ee924780ab5",
+  "required_hooks": {
+    "drivers/input/input.c": {
+      "ksu_handle_input_handle_event": 2
+    },
+    "fs/exec.c": {
+      "ksu_handle_execveat": 2,
+      "ksu_handle_execveat_sucompat": 2,
+      "ksu_handle_post_execveat_sucompat": 3
+    },
+    "fs/open.c": {
+      "ksu_handle_faccessat": 2
+    },
+    "fs/read_write.c": {
+      "ksu_handle_sys_read": 2
+    },
+    "fs/stat.c": {
+      "ksu_handle_stat": 2,
+      "ksu_handle_vfs_fstat": 2
+    },
+    "fs/susfs.c": {
+      "ksu_handle_setresuid": 1
+    },
+    "kernel/reboot.c": {
+      "ksu_handle_sys_reboot": 2
+    },
+    "kernel/sys.c": {
+      "ksu_handle_setresuid": 3
+    }
+  },
+  "schema": 2,
+  "seed_files": [
+    "Makefile",
+    "block/ioprio.c",
+    "drivers/input/input.c",
+    "drivers/kernelsu/probes.h",
+    "fs/Makefile",
+    "fs/exec.c",
+    "fs/internal.h",
+    "fs/namei.c",
+    "fs/namespace.c",
+    "fs/notify/fdinfo.c",
+    "fs/open.c",
+    "fs/proc/base.c",
+    "fs/proc/cmdline.c",
+    "fs/proc/fd.c",
+    "fs/proc/task_mmu.c",
+    "fs/proc_namespace.c",
+    "fs/read_write.c",
+    "fs/readdir.c",
+    "fs/stat.c",
+    "fs/statfs.c",
+    "fs/super.c",
+    "kernel/kallsyms.c",
+    "kernel/reboot.c",
+    "kernel/sys.c",
+    "mm/memory.c",
+    "security/security.c",
+    "security/selinux/avc.c",
+    "security/selinux/hooks.c",
+    "security/selinux/include/security.h",
+    "security/selinux/ss/services.c"
+  ],
+  "source_helper_path": "Patches/susfs_inline_hook_patches.sh",
+  "source_patch_path": "Patches/Patch/susfs_patch_to_4.19.patch",
+  "source_repository": "https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd",
+  "targets": [
+    "block/ioprio.c",
+    "drivers/input/input.c",
+    "fs/Makefile",
+    "fs/exec.c",
+    "fs/namei.c",
+    "fs/namespace.c",
+    "fs/notify/fdinfo.c",
+    "fs/open.c",
+    "fs/proc/base.c",
+    "fs/proc/cmdline.c",
+    "fs/proc/fd.c",
+    "fs/proc/task_mmu.c",
+    "fs/proc_namespace.c",
+    "fs/read_write.c",
+    "fs/readdir.c",
+    "fs/stat.c",
+    "fs/statfs.c",
+    "fs/super.c",
+    "fs/susfs.c",
+    "include/linux/susfs.h",
+    "include/linux/susfs_def.h",
+    "kernel/kallsyms.c",
+    "kernel/reboot.c",
+    "kernel/sys.c",
+    "mm/memory.c",
+    "security/security.c",
+    "security/selinux/avc.c",
+    "security/selinux/hooks.c",
+    "security/selinux/ss/services.c"
+  ],
+  "upstream_commit": "ef537d74c6966c2a76d258a4108ec1b40fdd8d1f",
+  "vendor_base_commit": "38abda3e382f6e5e637a231400617babea54cbad"
+}

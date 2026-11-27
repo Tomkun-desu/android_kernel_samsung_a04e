@@ -1,0 +1,7 @@
+/out/
+/artifacts/
+/toolchain/
+/package-anykernel/
+/package-odin-reference/
+/build.log
+__pycache__/

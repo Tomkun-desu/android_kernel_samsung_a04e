@@ -1,0 +1,8 @@
+[submodule "KernelSU"]
+	path = KernelSU
+	url = https://github.com/Baka-SU/BakaSU.git
+	branch = main
+[submodule "NoMount"]
+	path = NoMount
+	url = https://github.com/maxsteeel/nomount.git
+	branch = dev

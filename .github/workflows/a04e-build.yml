@@ -1,4 +1,4 @@
-name: Samsung A04e source and build
+name: Samsung A04e source and experimental builds
 
 on:
   push:
@@ -10,6 +10,12 @@ on:
         required: false
         default: false
         type: boolean
+      variant:
+        description: Build the floating root port or the verified original Samsung baseline
+        required: false
+        default: root
+        type: choice
+        options: [root, stock]
 
 permissions:
   contents: read
@@ -80,12 +86,15 @@ jobs:
     needs: import
     if: always() && (needs.import.result == 'success' || needs.import.result == 'skipped')
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 120
+    env:
+      ROOT_BUILD: ${{ github.event_name == 'push' || (!inputs.import_sources && inputs.variant != 'stock') }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.import.outputs.commit || github.sha }}
+          ref: ${{ needs.import.outputs.commit || (inputs.variant == 'stock' && '949b0f000666943e2b380c91b74823521ea7e6a9') || github.sha }}
           fetch-depth: 1
+          submodules: recursive
           persist-credentials: false
 
       - name: Install the host build dependencies
@@ -102,26 +111,67 @@ jobs:
           bash -n .github/scripts/setup-toolchains.sh
           bash -n .github/scripts/build-samsung.sh
 
+      - name: Check the root port and package regressions
+        if: env.ROOT_BUILD == 'true'
+        run: |
+          python3 -B scripts/tests/test-a04e-build-root.py
+          python3 -B scripts/tests/test-a042f-root-regressions.py
+          python3 -B scripts/tests/test-a042f-susfs.py
+          python3 -B scripts/tests/test-a042f-package.py
+          bash -n scripts/prepare-a042f.sh .github/scripts/build-root.sh
+
+      - name: Resolve and verify floating BakaSU, paired SUSFS and NoMount sources
+        if: env.ROOT_BUILD == 'true'
+        run: bash scripts/prepare-a042f.sh
+
       - name: Download and verify the vendor compiler generation
         run: bash .github/scripts/setup-toolchains.sh
 
       - name: Build the stock kernel using Samsung's recipe
+        if: env.ROOT_BUILD != 'true'
         run: bash .github/scripts/build-samsung.sh
+
+      - name: Build and verify the root port with Samsung's compiler generation
+        id: root_build
+        if: env.ROOT_BUILD == 'true'
+        run: bash .github/scripts/build-root.sh 2>&1 | tee build.log
 
       - name: Verify the collected output digests
         working-directory: artifacts
         run: sha256sum -c SHA256SUMS
 
-      - name: Publish the stock build outputs
+      - name: Publish verified build outputs and provenance
         uses: actions/upload-artifact@v4
         with:
-          name: Samsung-A04e-4.19.191-stock-${{ github.run_id }}
+          name: Samsung-A04e-4.19.191-${{ env.ROOT_BUILD == 'true' && 'root-EXPERIMENTAL' || 'stock' }}-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: error
           compression-level: 6
 
+      - name: Package the experimental AnyKernel and EXF2 reference Odin outputs
+        if: env.ROOT_BUILD == 'true'
+        run: bash .github/scripts/package-root.sh
+
+      - name: Publish the AnyKernel installer layout
+        if: env.ROOT_BUILD == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SM-A042F-Samsung-4.19.191-BakaSU-SUSFS-NoMount-${{ github.run_id }}-AK3-EXPERIMENTAL
+          path: package-anykernel/
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Publish the experimental EXF2 reference Odin package
+        if: env.ROOT_BUILD == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SM-A042F-Samsung-4.19.191-BakaSU-SUSFS-NoMount-${{ github.run_id }}-ODIN-REF-EXF2-EXPERIMENTAL
+          path: package-odin-reference/
+          compression-level: 0
+          if-no-files-found: error
+
       - name: Record the build scope
-        if: always()
+        if: always() && env.ROOT_BUILD != 'true'
         run: |
           {
             echo '### Stock Samsung baseline'
@@ -129,3 +179,28 @@ jobs:
             echo 'Samsung flags: KCFLAGS=-w CONFIG_SECTION_MISMATCH_WARN_ONLY=y.'
             echo 'No BakaSU, SUSFS or NoMount integration in this baseline. Outputs are not flashable packages and have not been device tested.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record the experimental build scope
+        if: always() && env.ROOT_BUILD == 'true'
+        run: |
+          {
+            echo '### Official Samsung source with an experimental root port'
+            echo 'Clang r383902 and Android GCC 4.9 binutils; original a04e_defconfig plus a04e-root.config.'
+            echo 'BakaSU main, paired Jack mainline SUSFS patch/helper and NoMount dev resolve once per build.'
+            echo 'Exact SHAs, configuration, linked symbols and preparation diff are retained with the raw outputs.'
+            echo 'DEFEX is disabled; SELinux stays enabled. Seven clock tables and probes are checked outside init memory.'
+            echo 'AnyKernel preserves the installed boot components. Odin uses the explicitly labeled EXF2 reference, not a matching EZF2 boot.'
+            echo 'Device bootability, firmware compatibility and boot partition capacity remain unverified.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Samsung-A04e-failure-${{ github.run_id }}
+          path: |
+            build.log
+            out/.config
+            out/a042f-sources.env
+          include-hidden-files: true
+          if-no-files-found: ignore

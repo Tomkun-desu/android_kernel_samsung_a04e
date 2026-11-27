@@ -1,0 +1,213 @@
+diff --git a/fs/Makefile b/fs/Makefile
+--- a/fs/Makefile
++++ b/fs/Makefile
+@@ -142,3 +142,4 @@
+ obj-$(CONFIG_PSTORE)		+= pstore/
+ obj-$(CONFIG_EFIVAR_FS)		+= efivarfs/
+ obj-$(CONFIG_EROFS_FS)		+= erofs/
++obj-$(CONFIG_NOMOUNT)		+= nomount/
+diff --git a/fs/exec.c b/fs/exec.c
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1756,13 +1756,13 @@
+ 	if (IS_ERR(filename))
+ 		return PTR_ERR(filename);
+ #ifdef CONFIG_KSU_SUSFS
+-	if (likely(susfs_is_current_proc_no_su()))
++	if (!filename || likely(susfs_is_current_proc_no_su()))
+ 		goto orig_flow;
+ 	if (static_branch_likely(&ksu_su_compat_enabled)) {
+ 		if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted))
+-		is_su_session = !ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
+-	else
+-		is_su_session = !ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
++			is_su_session = !ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
++		else
++			is_su_session = !ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
+ 	}
+ orig_flow:
+ #endif
+@@ -1899,6 +1899,10 @@
+ 	rseq_execve(current);
+ 	acct_update_integrals(current);
+ 	task_numa_free(current, false);
++#ifdef CONFIG_KSU_SUSFS
++	if (unlikely(is_su_session))
++		(void)ksu_handle_post_execveat_sucompat(&fd, &filename, &argv, &envp, &flags, &retval);
++#endif
+ 	free_bprm(bprm);
+ 	kfree(pathbuf);
+ 	if (filename)
+@@ -1917,11 +1921,6 @@
+ 	current->fs->in_exec = 0;
+ 	current->in_execve = 0;
+ 
+-#ifdef CONFIG_KSU_SUSFS
+-	if (unlikely(is_su_session))
+-		(void)ksu_handle_post_execveat_sucompat(&fd, &filename, &argv, &envp, &flags, &retval);
+-#endif // #ifdef CONFIG_KSU_SUSFS
+-
+ out_free:
+ 	free_bprm(bprm);
+ 	kfree(pathbuf);
+@@ -1930,6 +1929,10 @@
+ 	if (displaced)
+ 		reset_files_struct(displaced);
+ out_ret:
++#ifdef CONFIG_KSU_SUSFS
++	if (unlikely(is_su_session))
++		(void)ksu_handle_post_execveat_sucompat(&fd, &filename, &argv, &envp, &flags, &retval);
++#endif
+ 	if (filename)
+ 		putname(filename);
+ 	return retval;
+diff --git a/fs/namei.c b/fs/namei.c
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -1662,7 +1662,7 @@
+ 	}
+ #else // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
+ 	if (dentry)
+-		return dentry;	
++		return dentry;
+ #endif
+ 
+ 	/* Don't create child dentry for a dead directory. */
+@@ -3863,7 +3863,16 @@
+ 		{
+ 			fake_filename = susfs_open_redirect_spoof_do_sys_openat(nd->path.dentry->d_inode);
+ 			if (fake_filename && !IS_ERR(fake_filename)) {
++				struct file *redirect_file;
+ 				const char *new_s = NULL;
++
++				redirect_file = alloc_empty_file(op->open_flag, current_cred());
++				if (IS_ERR(redirect_file)) {
++					error = PTR_ERR(redirect_file);
++					goto out_terminate_walk;
++				}
++				fput(file);
++				file = redirect_file;
+ 				terminate_walk(nd);
+ 				restore_nameidata();
+ 				set_nameidata(nd, old_dfd, fake_filename);
+@@ -3875,6 +3884,7 @@
+ 				}
+ 			}
+ 		}
++	out_terminate_walk:
+ #endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+ 		terminate_walk(nd);
+ 	}
+diff --git a/fs/proc/fd.c b/fs/proc/fd.c
+--- a/fs/proc/fd.c
++++ b/fs/proc/fd.c
+@@ -93,7 +93,7 @@
+ 				goto orig_flow;
+ 			}
+ 			dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
+-			if (!dpath) {
++			if (IS_ERR(dpath)) {
+ 				goto out_kfree;
+ 			}
+ 			if (kern_path(dpath, 0, &path)) {
+diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+--- a/fs/proc/task_mmu.c
++++ b/fs/proc/task_mmu.c
+@@ -23,6 +23,7 @@
+ #include <linux/freezer.h>
+ #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
+ #include <linux/susfs_def.h>
++#include <linux/srcu.h>
+ #endif
+ 
+ #include <asm/elf.h>
+diff --git a/fs/read_write.c b/fs/read_write.c
+--- a/fs/read_write.c
++++ b/fs/read_write.c
+@@ -596,13 +596,13 @@
+ 
+ #ifdef CONFIG_KSU
+ extern struct static_key_true ksu_is_init_rc_hook_enabled;
+-extern __attribute__((cold)) int ksu_handle_sys_read(unsigned int fd);
++extern __attribute__((cold)) int ksu_handle_sys_read(unsigned int fd, char __user **buf_ptr, size_t *count_ptr);
+ #endif
+ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+ {
+ #ifdef CONFIG_KSU
+ 	if (static_branch_unlikely(&ksu_is_init_rc_hook_enabled))
+-		ksu_handle_sys_read(fd);
++		ksu_handle_sys_read(fd, &buf, &count);
+ #endif
+ 	return ksys_read(fd, buf, count);
+ }
+diff --git a/fs/susfs.c b/fs/susfs.c
+--- a/fs/susfs.c
++++ b/fs/susfs.c
+@@ -25,6 +25,7 @@
+ #include <linux/bitmap.h>
+ #include <linux/limits.h>
+ #include <linux/rcupdate.h>
++#include <linux/srcu.h>
+ #include <linux/string.h>
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+ #include <linux/vmalloc.h> // For compatibility with older kernels
+@@ -80,8 +81,10 @@
+ #define SUSFS_LOGI_RL(fmt, ...) if (static_branch_likely(&susfs_is_log_enabled)) pr_info_ratelimited("susfs:[%u][%d][%s] " fmt, current_uid().val, current->pid, __func__, ##__VA_ARGS__)
+ #define SUSFS_LOGE_RL(fmt, ...) if (static_branch_likely(&susfs_is_log_enabled)) pr_err_ratelimited("susfs:[%u][%d][%s]" fmt, current_uid().val, current->pid, __func__, ##__VA_ARGS__)
+ #else
+-#define SUSFS_LOGI(fmt, ...) 
+-#define SUSFS_LOGE(fmt, ...) 
++#define SUSFS_LOGI(fmt, ...)
++#define SUSFS_LOGE(fmt, ...)
++#define SUSFS_LOGI_RL(fmt, ...)
++#define SUSFS_LOGE_RL(fmt, ...)
+ #endif
+ 
+ /* selinux hide */
+@@ -495,7 +498,7 @@
+ /* The uids of the apps that are denied to see the added sus paths.
+  * Other uids within the app uid range (10000 - 19999) are still able
+  * to see all added sus paths.
+- * Effective only on process with uid >= 10000 
++ * Effective only on process with uid >= 10000
+  */
+ struct susfs_sus_path_uid_filter_bitmap {
+ 	struct rcu_head                 rcu;
+@@ -944,7 +947,7 @@
+ 		info.err = -EFAULT;
+ 		goto out_copy_to_user;
+ 	}
+-	
++
+ 	if (info.enabled) {
+ 		static_branch_enable(&susfs_is_hide_sus_mnts_for_non_su_procs_enabled);
+ 	} else {
+@@ -1318,7 +1321,7 @@
+ 		is_fuse = true;
+ 		goto out_spoof_kstat;
+ 	}
+-	
++
+ 	if (!inode->i_mapping) {
+ 		SUSFS_LOGE("inode->i_mapping is NULL\n");
+ 		return;
+@@ -2695,4 +2698,3 @@
+ 
+ /* No module exit is needed becuase it should never be a loadable kernel module */
+ //void __init susfs_exit(void)
+-
+diff --git a/kernel/reboot.c b/kernel/reboot.c
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -321,9 +321,8 @@
+ 	char buffer[256];
+ 	int ret = 0;
+ #ifdef CONFIG_KSU_SUSFS
+-    if (system_state == SYSTEM_RUNNING) {
+-        ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
+-    }
++	if (system_state == SYSTEM_RUNNING)
++		ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
+ #endif
+ 
+ 
