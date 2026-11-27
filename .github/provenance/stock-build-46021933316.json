@@ -1,0 +1,36 @@
+{
+  "result": "PASS",
+  "run_id": 46021933316,
+  "kernel_commit": "949b0f000666943e2b380c91b74823521ea7e6a9",
+  "banner": "Linux version 4.19.191-g949b0f000666 (runner@runnervm9f4oe) (Android (6443078 based on r383902) clang version 11.0.1 (https://android.googlesource.com/toolchain/llvm-project b397f81060ce6d701042b782172ed13bee898b79), GNU ld (binutils-2.27-bd24d23f) 2.27.0.20170315) #1 SMP PREEMPT Fri Nov 27 15:11:22 UTC 2026",
+  "checksummed_files": 17,
+  "image_bytes": 34482192,
+  "image_gz_bytes": 11980519,
+  "dtbs": [
+    {
+      "name": "mt6765_a04e_eur_open_00.dtb",
+      "bytes": 64951,
+      "sha256": "a1c3cb1cb9ba23bc21c89d74669378805a075ab2d9631f3a56e9088804804326"
+    }
+  ],
+  "aarch64_modules": [
+    "modules/kernel/kheaders.ko",
+    "modules/drivers/mmc/host/sdhci-pltfm.ko",
+    "modules/drivers/mmc/host/sdhci.ko",
+    "modules/drivers/power/supply/mt6359_battery.ko",
+    "modules/drivers/tty/serial/8250/8250_of.ko",
+    "modules/drivers/usb/gadget/udc/dummy_hcd.ko",
+    "modules/kernel/trace/trace_mmstat.ko",
+    "modules/net/ipv4/tcp_htcp.ko",
+    "modules/net/ipv4/tcp_westwood.ko",
+    "modules/sound/soc/codecs/mt6359-accdet.ko"
+  ],
+  "stock_DEFEX_enabled": true,
+  "root_integration_absent": true,
+  "actual_modpost_section_mismatches": 14,
+  "device_tested": false,
+  "clock_lifetime_check": {
+    "result": "FAIL on unmodified stock baseline, correction staged separately",
+    "output": "Persistent clock path in freed init memory: audio_clks"
+  }
+}
