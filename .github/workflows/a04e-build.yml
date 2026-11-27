@@ -1,0 +1,131 @@
+name: Samsung A04e source and build
+
+on:
+  push:
+    branches: [a04e]
+  workflow_dispatch:
+    inputs:
+      import_sources:
+        description: Import the supplied official archives before the first stock build
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: samsung-a04e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  import:
+    if: github.event_name == 'workflow_dispatch' && inputs.import_sources
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    outputs:
+      commit: ${{ steps.import.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Exercise the archive importer
+        run: python3 -B .github/scripts/test-import-samsung.py
+
+      - name: Download the recorded source archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/source-inputs"
+          gh release download samsung-source-inputs-20261127 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'SM-A042F_14_Opensource*.zip' --dir "$RUNNER_TEMP/source-inputs"
+
+      - name: Import and verify the official kernel and platform trees
+        id: import
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = a04e
+          test ! -e Makefile
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config core.autocrlf false
+          python3 -B .github/scripts/import-samsung.py \
+            --assets "$RUNNER_TEMP/source-inputs" --manifest .github/samsung-sources.json \
+            --record "$RUNNER_TEMP/samsung-import-verification.json"
+          git merge --no-ff --allow-unrelated-histories samsung-stock \
+            -m 'import(a04e): base builds on the official Samsung source and update'
+          git push origin samsung-base samsung-stock samsung-platform a04e
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Official source import'
+            echo 'Raw kernel, official update and platform branches were read back against the archive file contents and modes.'
+            echo '```'
+            git log -4 --oneline --all
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain import provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Samsung-A04e-source-import-${{ github.run_id }}
+          path: ${{ runner.temp }}/samsung-import-verification.json
+          if-no-files-found: warn
+
+  build:
+    needs: import
+    if: always() && (needs.import.result == 'success' || needs.import.result == 'skipped')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.import.outputs.commit || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install the host build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential cpio device-tree-compiler flex \
+            libelf-dev libncurses5 libssl-dev lz4 python3
+
+      - name: Check the repository automation
+        run: |
+          python3 -B .github/scripts/test-import-samsung.py
+          python3 -B .github/scripts/test-verify-samsung.py
+          bash -n .github/scripts/setup-toolchains.sh
+          bash -n .github/scripts/build-samsung.sh
+
+      - name: Download and verify the vendor compiler generation
+        run: bash .github/scripts/setup-toolchains.sh
+
+      - name: Build the stock kernel using Samsung's recipe
+        run: bash .github/scripts/build-samsung.sh
+
+      - name: Verify the collected output digests
+        working-directory: artifacts
+        run: sha256sum -c SHA256SUMS
+
+      - name: Publish the stock build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Samsung-A04e-4.19.191-stock-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Record the build scope
+        if: always()
+        run: |
+          {
+            echo '### Stock Samsung baseline'
+            echo 'Clang r383902, Android GCC 4.9 binutils, a04e_defconfig, ANDROID_MAJOR_VERSION=r.'
+            echo 'Samsung flags: KCFLAGS=-w CONFIG_SECTION_MISMATCH_WARN_ONLY=y.'
+            echo 'No BakaSU, SUSFS or NoMount integration in this baseline. Outputs are not flashable packages and have not been device tested.'
+          } >> "$GITHUB_STEP_SUMMARY"

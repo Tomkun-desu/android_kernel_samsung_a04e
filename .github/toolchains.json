@@ -1,0 +1,12 @@
+{
+  "clang": {
+    "commit": "252aba16f513a857bc923172f67b0e55e23de35f",
+    "directory": "toolchain/clang/host/linux-x86/clang-r383902",
+    "url": "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/252aba16f513a857bc923172f67b0e55e23de35f/clang-r383902.tar.gz"
+  },
+  "binutils": {
+    "commit": "606f80986096476912e04e5c2913685a8f2c3b65",
+    "directory": "toolchain/gcc/linux-x86/aarch64/aarch64-linux-android-4.9",
+    "url": "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/606f80986096476912e04e5c2913685a8f2c3b65.tar.gz"
+  }
+}
