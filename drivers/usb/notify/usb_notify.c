@@ -35,6 +35,9 @@
 
 #define DEFAULT_OVC_POLL_SEC 3
 
+static int usb_restrict;
+module_param(usb_restrict, int, 0444);
+
 struct  ovc {
 	struct otg_notify *o_notify;
 	wait_queue_head_t	 delay_wait;
@@ -755,6 +758,12 @@ static void reserve_state_check(struct work_struct *work)
 			struct usb_notify, b_delay);
 	int enable = 1, type = 0;
 	unsigned long state = 0;
+
+	if (usb_restrict == 1) {
+		pr_info("%s usb restrict param is set, disable all USB operations\n", __func__);
+		return;
+	}
+
 
 	if (u_noti->o_notify->booting_delay_sync_usb) {
 		pr_info("%s wait dwc3 probe done\n", __func__);
@@ -2180,6 +2189,11 @@ bool is_blocked(struct otg_notify *n, int type)
 {
 	struct usb_notify *u_notify = NULL;
 	int ret = 0;
+
+	if (usb_restrict == 1) {
+		pr_info("%s cause:usb_restrict\n", __func__);
+		goto end2;
+	}
 
 	if (!n) {
 		pr_err("%s otg_notify is null\n", __func__);
