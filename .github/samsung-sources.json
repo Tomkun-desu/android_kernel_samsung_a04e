@@ -1,0 +1,18 @@
+{
+  "release": "samsung-source-inputs-20261127",
+  "full": {
+    "asset": "SM-A042F_14_Opensource.zip",
+    "sha256": "d388870c016573896e12aa53d3d8a7c750bdef5d325babf4a2a25adaa6428f58",
+    "bytes": 243646684,
+    "kernel_regular_files": 77166,
+    "kernel_symlinks": 34,
+    "platform_regular_files": 11985
+  },
+  "update": {
+    "asset": "SM-A042F_14_Opensource-update.zip",
+    "sha256": "890d8ae905708281b973fcda3dc02ca69b7914a7ec0b8f96e04551e2d4ffa6f0",
+    "bytes": 609059,
+    "original_name": "SM-A042F_14_Opensource_A042FXXSGEZE1_A042FXXSGEZF1_A042MUBSHEZF1_A042FXXSGEZF2_A042MUBSHEZF2_A042FXXSGEZF4_A042FXXSHEZH1_A042MUBSIEZH1_A042FXXSHEZH2_A042MUBSIEZH2.zip"
+  },
+  "update_regular_files": 62
+}
