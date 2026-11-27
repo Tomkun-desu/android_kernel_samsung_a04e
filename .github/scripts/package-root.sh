@@ -31,11 +31,26 @@ echo "89cefac0a318afa39fb3880c45c87b036c05bc1ebf02a7a715b7f8d7c26ac6e7  $RUNNER_
 unzip -p "$RUNNER_TEMP/Magisk-v31.1.apk" lib/x86_64/libmagiskboot.so > "$RUNNER_TEMP/a042f-magiskboot"
 chmod 755 "$RUNNER_TEMP/a042f-magiskboot"
 A042F_TEST_MAGISKBOOT="$RUNNER_TEMP/a042f-magiskboot" python3 -B scripts/tests/test-a042f-package.py
-curl --fail --location --retry 3 --max-time 180 --max-filesize 67108864 \
-    --proto '=https' --proto-redir '=https' \
-    https://github.com/ravindu644/android_kernel_a042f/releases/download/v3/KernelSU-Next-SM-A042F.tar \
-    -o "$RUNNER_TEMP/a042f-reference.tar"
-python3 -B scripts/package-a042f.py odin-reference --artifacts artifacts \
-    --reference-tar "$RUNNER_TEMP/a042f-reference.tar" \
-    --magiskboot "$RUNNER_TEMP/a042f-magiskboot" --output package-odin-reference
-(cd package-odin-reference && sha256sum -c SHA256SUMS)
+if [[ -n "${STOCK_BOOT_URL:-}" ]]; then
+    [[ "$STOCK_BOOT_URL" == https://* ]]
+    [[ "${STOCK_BOOT_SHA256:-}" =~ ^[0-9a-f]{64}$ ]]
+    [[ "${STOCK_FIRMWARE:-}" =~ ^A042F[A-Z0-9]{6,}$ ]]
+    curl --fail --location --retry 3 --max-time 300 --max-filesize 67108864 \
+        --proto '=https' --proto-redir '=https' \
+        "$STOCK_BOOT_URL" -o "$RUNNER_TEMP/boot_stock.img"
+    echo "$STOCK_BOOT_SHA256  $RUNNER_TEMP/boot_stock.img" | sha256sum -c -
+    python3 -B scripts/package-a042f.py odin --artifacts artifacts \
+        --stock-boot "$RUNNER_TEMP/boot_stock.img" --stock-sha256 "$STOCK_BOOT_SHA256" \
+        --firmware "$STOCK_FIRMWARE" \
+        --magiskboot "$RUNNER_TEMP/a042f-magiskboot" --output package-odin
+    (cd package-odin && sha256sum -c SHA256SUMS)
+else
+    curl --fail --location --retry 3 --max-time 180 --max-filesize 67108864 \
+        --proto '=https' --proto-redir '=https' \
+        https://github.com/ravindu644/android_kernel_a042f/releases/download/v3/KernelSU-Next-SM-A042F.tar \
+        -o "$RUNNER_TEMP/a042f-reference.tar"
+    python3 -B scripts/package-a042f.py odin-reference --artifacts artifacts \
+        --reference-tar "$RUNNER_TEMP/a042f-reference.tar" \
+        --magiskboot "$RUNNER_TEMP/a042f-magiskboot" --output package-odin-reference
+    (cd package-odin-reference && sha256sum -c SHA256SUMS)
+fi

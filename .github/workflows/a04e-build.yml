@@ -16,6 +16,18 @@ on:
         default: root
         type: choice
         options: [root, stock]
+      stock_boot_url:
+        description: HTTPS URL of this phone's own boot.img dump (root variant, enables the matching Odin package)
+        required: false
+        default: ''
+      stock_boot_sha256:
+        description: SHA256 of that boot.img dump
+        required: false
+        default: ''
+      stock_firmware:
+        description: Firmware/AP identifier of that boot.img
+        required: false
+        default: A042FXXSGEZF2
 
 permissions:
   contents: read
@@ -89,6 +101,9 @@ jobs:
     timeout-minutes: 120
     env:
       ROOT_BUILD: ${{ github.event_name == 'push' || (!inputs.import_sources && inputs.variant != 'stock') }}
+      STOCK_BOOT_URL: ${{ inputs.stock_boot_url }}
+      STOCK_BOOT_SHA256: ${{ inputs.stock_boot_sha256 }}
+      STOCK_FIRMWARE: ${{ inputs.stock_firmware }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -162,11 +177,20 @@ jobs:
           if-no-files-found: error
 
       - name: Publish the experimental EXF2 reference Odin package
-        if: env.ROOT_BUILD == 'true'
+        if: env.ROOT_BUILD == 'true' && env.STOCK_BOOT_URL == ''
         uses: actions/upload-artifact@v4
         with:
           name: SM-A042F-Samsung-4.19.191-BakaSU-SUSFS-NoMount-${{ github.run_id }}-ODIN-REF-EXF2-EXPERIMENTAL
           path: package-odin-reference/
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Publish the matching Odin package
+        if: env.ROOT_BUILD == 'true' && env.STOCK_BOOT_URL != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: SM-A042F-Samsung-4.19.191-BakaSU-SUSFS-NoMount-${{ github.run_id }}-ODIN-MATCHING-${{ inputs.stock_firmware }}-EXPERIMENTAL
+          path: package-odin/
           compression-level: 0
           if-no-files-found: error
 
