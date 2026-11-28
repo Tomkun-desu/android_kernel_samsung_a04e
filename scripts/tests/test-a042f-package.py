@@ -369,6 +369,9 @@ class PackagingTests(unittest.TestCase):
     def test_boot_parser_guards(self):
         for version in (0, 1, 2):
             self.assertEqual(package.boot_image(boot(version))[0], version)
+        # Samsung signs the image after the marker; magiskboot keeps only the marker.
+        self.assertEqual(package.boot_image(
+            boot() + b'SEANDROIDENFORCE' + b'SignerVer02' + bytes(4096))[0], 2)
         mutations = []
         for offset, value in ((40, 3), (36, 3000), (8, 0xffffffff), (1644, 1), (1636, 1)):
             invalid = bytearray(boot())
